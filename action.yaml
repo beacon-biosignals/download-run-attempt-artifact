@@ -62,7 +62,7 @@ runs:
         GH_TOKEN: ${{ inputs.token }}
         run_id: ${{ inputs.run-id }}
         run_attempt: ${{ inputs.run-attempt }}
-        name: ${{ inputs.artifact-name }}
+        name: ${{ inputs.name }}
         path: ${{ inputs.path }}
         merge_multiple: ${{ inputs.merge-multiple }}
         allow_fallback: ${{ inputs.allow-fallback }}

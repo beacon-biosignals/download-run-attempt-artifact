@@ -1,0 +1,33 @@
+---
+name: Integration Tests
+on:
+  pull_request:
+    paths:
+      - "action.yaml"
+      - ".github/workflows/integration-tests.yaml"
+
+jobs:
+  test:
+    name: Default inputs
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        if: ${{ github.run-attempt > 1 }}
+        with:
+          run-id: ${{ github.run-id }}
+          run-attempt: ${{ github.run-attempt }}
+          allow-fallback: true
+      - name: Show downloaded run-attempt file
+        if: ${{ github.run-attempt > 1 }}
+        run: |
+          cat run-attempt
+      - name: Create run-attempt file
+        run: |
+          echo "${{ github.run-attempt }}" >run-attempt
+      - uses: actions/upload-artifact
+        with:
+          name: my-artifact
+          path: run-attempt

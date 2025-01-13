@@ -1,6 +1,8 @@
 # Download Run Attempt Artifact
 
-Download GHA artifacts from a specific run attempt.
+Downloads an artifact which was uploaded by workflow in the specified run attempt. This
+action mirrors the `actions/download-artifact` but additionally supports downloading an
+artifact from a specific `run-attempt`.
 
 ## Example
 

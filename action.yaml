@@ -1,8 +1,12 @@
 ---
+name: Download Run Attempt Artifact
 description: >-
   Downloads an artifact which was uploaded by workflow in the specified run attempt. This
   action mirrors the `actions/download-artifact` but additionally supports downloading an
-  artifact from a specific `run-attempt`. 
+  artifact from a specific `run-attempt`.
+branding:
+  color: purple
+  icon: download
 # Inputs are intended to mirror the official action where applicable:
 # https://github.com/actions/download-artifact#inputs
 inputs:

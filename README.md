@@ -14,16 +14,16 @@ jobs:
       - uses: beacon-biosignals/download-run-attempt-artifact@v1
         if: ${{ github.run-attempt > 1 }}
         with:
-          run-id: ${{ github.run-id }}
-          run-attempt: ${{ github.run-attempt }}
+          run-id: ${{ github.run_id }}
+          run-attempt: ${{ github.run_attempt }}
           allow-fallback: true
       - name: Show downloaded run-attempt file
-        if: ${{ github.run-attempt > 1 }}
+        if: ${{ github.run_attempt > 1 }}
         run: |
           cat run-attempt
       - name: Create run-attempt file
         run: |
-          echo "${{ github.run-attempt }}" >run-attempt
+          echo "${{ github.run_attempt }}" >run-attempt
       - uses: actions/upload-artifact
         with:
           name: my-artifact

@@ -14,7 +14,7 @@ jobs:
       - name: Create file
         run: |
           jq -n \
-              --argjson job_key "${{ github.job }}" \
+              --arg job_key "${{ github.job }}" \
               --argjson run_attempt "${{ github.run_attempt }}" \
               '$ARGS.named' >metadata.json
           jq <metadata.json
@@ -31,7 +31,7 @@ jobs:
       - name: Create file
         run: |
           jq -n \
-              --argjson job_key "${{ github.job }}" \
+              --arg job_key "${{ github.job }}" \
               --argjson run_attempt "${{ github.run_attempt }}" \
               '$ARGS.named' >metadata.json
           jq <metadata.json

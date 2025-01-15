@@ -23,12 +23,10 @@ jobs:
           workflow-file: upload.yaml
           commit-sha: ${{ github.event.pull_request.head.sha }}
       - uses: beacon-biosignals/wait-for-job@v1
-        id: wait-for-job
         with:
           run-id: ${{ steps.workflow-run.outputs.run-id }}
-          job-name: All Attempts
+          job-name: Each Attempt
       - uses: beacon-biosignals/wait-for-job@v1
-        id: wait-for-job
         with:
           run-id: ${{ steps.workflow-run.outputs.run-id }}
           job-name: First Attempt

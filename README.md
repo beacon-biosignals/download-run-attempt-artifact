@@ -26,7 +26,7 @@ jobs:
       - name: Create run-attempt file
         run: |
           echo "${{ github.run_attempt }}" >run-attempt
-      - uses: actions/upload-artifact
+      - uses: actions/upload-artifact@v4
         with:
           name: my-artifact
           path: run-attempt

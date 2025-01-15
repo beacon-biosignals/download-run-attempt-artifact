@@ -1,0 +1,41 @@
+---
+name: Upload
+on:
+  pull_request:
+    paths:
+      - "action.yaml"
+      - ".github/workflows/integration-tests.yaml"
+
+jobs:
+  each-attempt:
+    name: Each Attempt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create file
+        run: |
+          jq -n \
+              --argjson job_key "${{ github.job }}" \
+              --argjson run_attempt "${{ github.run_attempt }}" \
+              '$ARGS.named' >metadata.json
+          jq <metadata.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: upload-each-attempt
+          path: metadata.json
+
+  first-attempt:
+    name: First Attempt
+    if: ${{ github.run_attempt == 1 }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create file
+        run: |
+          jq -n \
+              --argjson job_key "${{ github.job }}" \
+              --argjson run_attempt "${{ github.run_attempt }}" \
+              '$ARGS.named' >metadata.json
+          jq <metadata.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: upload-first-attempt
+          path: metadata.json

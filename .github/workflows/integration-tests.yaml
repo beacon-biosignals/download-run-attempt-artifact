@@ -36,6 +36,7 @@ jobs:
           gh api -X POST "/repos/{owner}/{repo}/actions/runs/${run_id:?}/rerun"
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           run_id: ${{ steps.workflow-run.outputs.run-id }}
 
   test-each-attempt:
@@ -60,7 +61,7 @@ jobs:
         id: download-run-attempt
         with:
           name: upload-each-attempt
-          run-id: ${{ needs.setup.output.run-id }}
+          run-id: ${{ needs.setup.outputs.run-id }}
           run-attempt: ${{ matrix.run-attempt }}
       - name: Show downloaded run-attempt file
         run: |
@@ -90,7 +91,7 @@ jobs:
         id: download-run-attempt
         with:
           name: upload-each-attempt
-          run-id: ${{ needs.setup.output.run-id }}
+          run-id: ${{ needs.setup.outputs.run-id }}
           run-attempt: ${{ matrix.run-attempt }}
           allow-fallback: true
       - name: Show downloaded run-attempt file

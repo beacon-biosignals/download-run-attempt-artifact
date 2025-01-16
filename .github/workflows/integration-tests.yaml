@@ -53,9 +53,12 @@ jobs:
       # Utilizing a unique workflow run name to be able to identify the dispatched `run_id`
       - name: Get workflow run
         id: workflow-run
+        shell: bash
         run: |
+          set -x
           workflow_id="$(gh api -X GET --paginate "/repos/{owner}/{repo}/actions/workflows" --jq ".workflows[] | select(.path == \".github/workflows/${workflow_file:?}\").id")"
-          run_id="$(gh api -X GET --paginate "/repos/{owner}/{repo}/actions/runs" -f head_sha="${commit_sha:?}" --jq ".workflow_runs | map(select(.workflow_id == ${workflow_id:?} and .name == \"${workflow_run_name:?}\")) | .[0].id")"
+          run="$(gh api -X GET --paginate "/repos/{owner}/{repo}/actions/runs" -f head_sha="${commit_sha:?}" --jq ".workflow_runs | map(select(.workflow_id == ${workflow_id:?} and .name == \"${workflow_run_name:?}\")) | .[0]")"
+          run_id="$(jq -er .id <<<"$run")"
           echo "run-id=${run_id:?}" | tee -a "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}

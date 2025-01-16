@@ -31,7 +31,7 @@ jobs:
           workflow: upload.yaml
           inputs: |
             {
-              "upload-on-run-attempts": "${{ matrix.criteria.upload-on-run-attempts || '[]' }}"
+              "upload-on-run-attempts": "${{ matrix.criteria.upload-on-run-attempts || '[]' }}",
               "fail-on-run-attempts": "${{ matrix.criteria.fail-on-run-attempts || '[]' }}"
             }
       - uses: beacon-biosignals/get-workflow-run@v1

@@ -18,7 +18,6 @@ jobs:
       actions: write
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 1  # Run sequentially due to current `get-workflow-run` limitations
       fail-fast: false
       matrix:
         criteria:
@@ -28,6 +27,8 @@ jobs:
           - upload-on-run-attempts: "[1,2]"
             fail-on-run-attempts: "[]"
             re-run-mode: single-job
+    env:
+      title: "Upload (${{ github.run_id }}, ${{ strategy.job-index }})"
     outputs:
       json: ${{ steps.matrix-output.outputs.json }}
     steps:
@@ -38,16 +39,22 @@ jobs:
           ref: ${{ env.BRANCH }}  # Workflow dispatch only works on branches or tags
           inputs: |
             {
-              "title": "Upload ${{ github.event.pull_request.head.sha }}",
+              "title": "${{ env.title }}",
               "upload-on-run-attempts": "${{ matrix.criteria.upload-on-run-attempts || '[]' }}",
               "fail-on-run-attempts": "${{ matrix.criteria.fail-on-run-attempts || '[]' }}"
             }
       - run: sleep 5
-      - uses: beacon-biosignals/get-workflow-run@v1
+      # Utilizing a unique workflow run name to be able to identify the dispatched `run_id`
+      - name: Get workflow run
         id: workflow-run
-        with:
-          workflow-file: upload.yaml
-          commit-sha: ${{ github.event.pull_request.head.sha }}
+        run: |
+          workflow_id="$(gh api -X GET --paginate "/repos/{owner}/{repo}/actions/workflows" --jq ".workflows[] | select(.path == \".github/workflows/${workflow_file:?}\").id")"
+          run_id="$(gh api -X GET --paginate "/repos/{owner}/{repo}/actions/runs" -f head_sha="${commit_sha:?}"--jq ".workflow_runs | map(select(.workflow_id == ${workflow_id:?} && .name == "${workflow_run_name:?}")) | .[0].id")"
+          echo "run-id=${run_id:?}" | tee -a "$GITHUB_OUTPUT"
+        env:
+          workflow_file: upload.yaml
+          workflow_run_name: ${{ env.title }}
+          commit_sha: ${{ github.event.pull_request.head.sha }}
       - uses: beacon-biosignals/wait-for-job@d572c2952a8938925a50b58e3fa361f0556c2421
         id: wait-for-job
         with:

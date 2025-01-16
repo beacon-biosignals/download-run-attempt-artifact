@@ -52,6 +52,8 @@ jobs:
           run_id="$(gh api -X GET --paginate "/repos/{owner}/{repo}/actions/runs" -f head_sha="${commit_sha:?}"--jq ".workflow_runs | map(select(.workflow_id == ${workflow_id:?} && .name == "${workflow_run_name:?}")) | .[0].id")"
           echo "run-id=${run_id:?}" | tee -a "$GITHUB_OUTPUT"
         env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           workflow_file: upload.yaml
           workflow_run_name: ${{ env.title }}
           commit_sha: ${{ github.event.pull_request.head.sha }}

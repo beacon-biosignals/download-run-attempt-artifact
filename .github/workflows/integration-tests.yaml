@@ -5,6 +5,12 @@ on:
     paths:
       - "action.yaml"
       - ".github/workflows/integration-tests.yaml"
+  push:
+    branches:
+      - main
+    paths:
+      - "action.yaml"
+      - ".github/workflows/integration-tests.yaml"
 
 env:
   BRANCH: ${{ github.head_ref || (github.ref_type == 'branch' && github.ref_name) }}

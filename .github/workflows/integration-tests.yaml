@@ -14,30 +14,70 @@ jobs:
     permissions:
       actions: write
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        criteria:
+          - upload-on-run-attempts: "[1,2]"
+            re-run-mode: all-jobs
+          - upload-on-run-attempts: "[1,2]"
+            re-run-mode: single-job
     outputs:
-      run-id: ${{ steps.workflow-run.outputs.run-id }}
+      json: ${{ steps.matrix-output.outputs.json }}
     steps:
+      - name: Initiate upload workflow
+        uses: benc-uk/workflow-dispatch@e2e5e9a103e331dad343f381a29e654aea3cf8fc # v1.2.4
+        with:
+          workflow: upload.yaml
+          inputs: |
+            {
+              "upload-on-run-attempts": "${{ matrix.criteria.upload-on-run-attempts || '[]' }}"
+              "fail-on-run-attempts": "${{ matrix.criteria.fail-on-run-attempts || '[]' }}"
+            }
       - uses: beacon-biosignals/get-workflow-run@v1
         id: workflow-run
         with:
           workflow-file: upload.yaml
           commit-sha: ${{ github.event.pull_request.head.sha }}
-      - uses: beacon-biosignals/wait-for-job@v1
+      - uses: beacon-biosignals/wait-for-job@d572c2952a8938925a50b58e3fa361f0556c2421
+        id: wait-for-job
         with:
           run-id: ${{ steps.workflow-run.outputs.run-id }}
-          job-name: Each Attempt
-      - uses: beacon-biosignals/wait-for-job@v1
-        with:
-          run-id: ${{ steps.workflow-run.outputs.run-id }}
-          job-name: First Attempt
+          job-name: Upload
       - name: Re-run workflow
+        if: ${{ matrix.criteria.re-run-mode == 'all-jobs' }}
         run: |
-          # https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2022-11-28#re-run-a-workflow
-          gh api -X POST "/repos/{owner}/{repo}/actions/runs/${run_id:?}/rerun"
+          case "$mode" in
+              all-jobs)
+                  # https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2022-11-28#re-run-a-workflow
+                  gh api -X POST "/repos/{owner}/{repo}/actions/runs/${run_id:?}/rerun"
+                  ;;
+              failed-jobs)
+                  # https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2022-11-28#re-run-failed-jobs-from-a-workflow-run
+                  gh api -X POST "/repos/{owner}/{repo}/actions/runs/${run_id:?}/rerun-failed-jobs"
+              single-job)
+                  # https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2022-11-28#re-run-a-job-from-a-workflow-run
+                  gh api -X POST "/repos/{owner}/{repo}/actions/jobs/${job_id:?}/rerun"
+              *)
+                  echo "Unhandled mode: $mode" >&2
+                  exit 1
+                  ;;
+          esac
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           run_id: ${{ steps.workflow-run.outputs.run-id }}
+          job_id: ${{ steps.wait-for-job.outputs.job-id }}
+          mode: ${{ matrix.criteria.re-run-mode }}
+      - uses: beacon-biosignals/wait-for-job@d572c2952a8938925a50b58e3fa361f0556c2421
+        with:
+          run-id: ${{ steps.workflow-run.outputs.run-id }}
+          job-name: Upload
+      - uses: beacon-biosignals/matrix-output@v1
+        id: matrix-output
+        with:
+          yaml: |
+            run-id: ${{ steps.workflow-run.outputs.run-id }}
 
   test-each-attempt:
     name: Test Each Attempt
@@ -61,7 +101,7 @@ jobs:
         id: download-run-attempt
         with:
           name: upload-each-attempt
-          run-id: ${{ needs.setup.outputs.run-id }}
+          run-id: ${{ fromJSON(needs.setup.outputs.json)[0].run-id }}
           run-attempt: ${{ matrix.run-attempt }}
       - name: Show downloaded run-attempt file
         run: |
@@ -69,31 +109,31 @@ jobs:
         env:
           run_attempt: ${{ matrix.run-attempt }}
 
-  test-first-attempt:
-    name: Test First Attempt
-    needs: setup
-    # These permissions are needed to:
-    # - Checkout the repo
-    # - Download an artifact
-    permissions:
-      actions: read
-      contents: read
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        run-attempt:
-          - 1
-          - 2
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./
-        id: download-run-attempt
-        with:
-          name: upload-each-attempt
-          run-id: ${{ needs.setup.outputs.run-id }}
-          run-attempt: ${{ matrix.run-attempt }}
-          allow-fallback: true
-      - name: Show downloaded run-attempt file
-        run: |
-          [[ "$(jq -er .run_attempt <metadata.json)" -eq 1 ]] || exit 1
+  # test-first-attempt:
+  #   name: Test First Attempt
+  #   needs: setup
+  #   # These permissions are needed to:
+  #   # - Checkout the repo
+  #   # - Download an artifact
+  #   permissions:
+  #     actions: read
+  #     contents: read
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       run-attempt:
+  #         - 1
+  #         - 2
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: ./
+  #       id: download-run-attempt
+  #       with:
+  #         name: upload-each-attempt
+  #         run-id: ${{ needs.setup.outputs.run-id }}
+  #         run-attempt: ${{ matrix.run-attempt }}
+  #         allow-fallback: true
+  #     - name: Show downloaded run-attempt file
+  #       run: |
+  #         [[ "$(jq -er .run_attempt <metadata.json)" -eq 1 ]] || exit 1

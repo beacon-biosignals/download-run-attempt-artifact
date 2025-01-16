@@ -1,14 +1,19 @@
 ---
 name: Upload
+run-name: ${{ inputs.title }}
 on:
   workflow_dispatch:
     inputs:
+      title:
+        description: Title of the workflow run
+        type: string
+        required: true
       upload-on-run-attempts:
-        decription: JSON list of run attempts to create an upload on
+        description: JSON list of run attempts to create an upload on
         type: string
         required: true
       fail-on-run-attempts:
-        decription: JSON list of run attempts to fail on
+        description: JSON list of run attempts to fail on
         type: string
         default: '[]'
 jobs:

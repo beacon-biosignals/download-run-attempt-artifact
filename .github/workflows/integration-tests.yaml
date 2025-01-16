@@ -18,12 +18,15 @@ jobs:
       actions: write
     runs-on: ubuntu-latest
     strategy:
+      max-parallel: 1  # Run sequentially due to current `get-workflow-run` limitations
       fail-fast: false
       matrix:
         criteria:
           - upload-on-run-attempts: "[1,2]"
+            fail-on-run-attempts: "[]"
             re-run-mode: all-jobs
           - upload-on-run-attempts: "[1,2]"
+            fail-on-run-attempts: "[]"
             re-run-mode: single-job
     outputs:
       json: ${{ steps.matrix-output.outputs.json }}
@@ -35,6 +38,7 @@ jobs:
           ref: ${{ env.BRANCH }}  # Workflow dispatch only works on branches or tags
           inputs: |
             {
+              "title": "Upload ${{ github.event.pull_request.head.sha }}",
               "upload-on-run-attempts": "${{ matrix.criteria.upload-on-run-attempts || '[]' }}",
               "fail-on-run-attempts": "${{ matrix.criteria.fail-on-run-attempts || '[]' }}"
             }

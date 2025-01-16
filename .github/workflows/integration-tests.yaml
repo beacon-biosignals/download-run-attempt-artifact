@@ -38,6 +38,7 @@ jobs:
               "upload-on-run-attempts": "${{ matrix.criteria.upload-on-run-attempts || '[]' }}",
               "fail-on-run-attempts": "${{ matrix.criteria.fail-on-run-attempts || '[]' }}"
             }
+      - run: sleep 5
       - uses: beacon-biosignals/get-workflow-run@v1
         id: workflow-run
         with:
@@ -49,7 +50,6 @@ jobs:
           run-id: ${{ steps.workflow-run.outputs.run-id }}
           job-name: Upload
       - name: Re-run workflow
-        if: ${{ matrix.criteria.re-run-mode == 'all-jobs' }}
         run: |
           case "$mode" in
               all-jobs)

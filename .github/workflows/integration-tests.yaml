@@ -6,6 +6,7 @@ on:
       - "action.yaml"
       - ".github/workflows/integration-tests.yaml"
   push:
+    tags: ["*"]
     branches:
       - main
     paths:

@@ -28,7 +28,7 @@ jobs:
             fail-on-run-attempts: "[]"
             re-run-mode: single-job
     env:
-      title: "Upload (${{ github.run_id }}, ${{ strategy.job-index }})"
+      title: "Upload (${{ github.run_id }}, ${{ github.run_attempt }}, ${{ strategy.job-index }})"
     outputs:
       json: ${{ steps.matrix-output.outputs.json }}
     steps:
@@ -49,7 +49,7 @@ jobs:
         id: workflow-run
         run: |
           workflow_id="$(gh api -X GET --paginate "/repos/{owner}/{repo}/actions/workflows" --jq ".workflows[] | select(.path == \".github/workflows/${workflow_file:?}\").id")"
-          run_id="$(gh api -X GET --paginate "/repos/{owner}/{repo}/actions/runs" -f head_sha="${commit_sha:?}"--jq ".workflow_runs | map(select(.workflow_id == ${workflow_id:?} && .name == "${workflow_run_name:?}")) | .[0].id")"
+          run_id="$(gh api -X GET --paginate "/repos/{owner}/{repo}/actions/runs" -f head_sha="${commit_sha:?}"--jq ".workflow_runs | map(select(.workflow_id == ${workflow_id:?} && .name == \"${workflow_run_name:?}\")) | .[0].id")"
           echo "run-id=${run_id:?}" | tee -a "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}

@@ -6,6 +6,9 @@ on:
       - "action.yaml"
       - ".github/workflows/integration-tests.yaml"
 
+env:
+  BRANCH: ${{ github.head_ref || (github.ref_type == 'branch' && github.ref_name) }}
+
 jobs:
   setup:
     name: Setup
@@ -29,6 +32,7 @@ jobs:
         uses: benc-uk/workflow-dispatch@e2e5e9a103e331dad343f381a29e654aea3cf8fc # v1.2.4
         with:
           workflow: upload.yaml
+          ref: ${{ env.BRANCH }}  # Workflow dispatch only works on branches or tags
           inputs: |
             {
               "upload-on-run-attempts": "${{ matrix.criteria.upload-on-run-attempts || '[]' }}",
@@ -55,9 +59,11 @@ jobs:
               failed-jobs)
                   # https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2022-11-28#re-run-failed-jobs-from-a-workflow-run
                   gh api -X POST "/repos/{owner}/{repo}/actions/runs/${run_id:?}/rerun-failed-jobs"
+                  ;;
               single-job)
                   # https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2022-11-28#re-run-a-job-from-a-workflow-run
                   gh api -X POST "/repos/{owner}/{repo}/actions/jobs/${job_id:?}/rerun"
+                  ;;
               *)
                   echo "Unhandled mode: $mode" >&2
                   exit 1

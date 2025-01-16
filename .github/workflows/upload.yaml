@@ -1,0 +1,50 @@
+---
+name: Upload
+run-name: ${{ inputs.title }}
+on:
+  workflow_dispatch:
+    inputs:
+      title:
+        description: Title of the workflow run
+        type: string
+        required: true
+      upload-on-run-attempts:
+        description: JSON list of run attempts to create an upload on
+        type: string
+        required: true
+      fail-on-run-attempts:
+        description: JSON list of run attempts to fail on
+        type: string
+        default: '[]'
+jobs:
+  upload:
+    name: Upload
+    runs-on: ubuntu-latest
+    steps:
+      - name: Process criteria
+        id: criteria
+        run: |
+          should_upload="$(jq --argjson run_attempt "$run_attempt" 'map($run_attempt == .) | any' <<<"$upload_on_run_attempts")"
+          echo "should-upload=$should_upload" | tee -a "$GITHUB_OUTPUT"
+
+          should_fail="$(jq --argjson run_attempt "$run_attempt" 'map($run_attempt == .) | any' <<<"$fail_on_run_attempts")"
+          echo "should-fail=$should_fail" | tee -a "$GITHUB_OUTPUT"
+        env:
+          run_attempt: ${{ github.run_attempt }}
+          upload_on_run_attempts: ${{ inputs.upload-on-run-attempts }}
+          fail_on_run_attempts: ${{ inputs.fail-on-run-attempts }}
+      - name: Create file
+        run: |
+          jq -n \
+              --arg job_key "${{ github.job }}" \
+              --argjson run_attempt "${{ github.run_attempt }}" \
+              '$ARGS.named' >metadata.json
+          jq <metadata.json
+      - uses: actions/upload-artifact@v4
+        if: ${{ steps.criteria.outputs.should-upload == 'true' }}
+        with:
+          name: upload
+          path: metadata.json
+      - name: Fail on attempt
+        if: ${{ steps.criteria.outputs.should-fail == 'true' }}
+        run: exit 1

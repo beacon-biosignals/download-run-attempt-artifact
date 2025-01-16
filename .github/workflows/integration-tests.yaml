@@ -1,0 +1,285 @@
+---
+name: Integration Tests
+on:
+  pull_request:
+    paths:
+      - "action.yaml"
+      - ".github/workflows/integration-tests.yaml"
+
+env:
+  BRANCH: ${{ github.head_ref || (github.ref_type == 'branch' && github.ref_name) }}
+
+jobs:
+  setup:
+    name: Setup ${{ matrix.criteria.title }}
+    # These permissions are needed to:
+    # - Re-run a job from a workflow: https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2022-11-28#re-run-a-job-from-a-workflow-run
+    permissions:
+      actions: write
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Order unfortunately matters here
+        criteria:
+          - title: Re-run Single Job
+            upload-on-run-attempts: "[1,2]"
+            fail-on-run-attempts: "[]"
+            re-run-mode: single-job
+          - title: Fallback
+            upload-on-run-attempts: "[1]"
+            fail-on-run-attempts: "[]"
+            re-run-mode: single-job
+          - title: Re-run Failed Jobs
+            upload-on-run-attempts: "[1,2]"
+            fail-on-run-attempts: "[1]"
+            re-run-mode: failed-jobs
+          - title: Re-run All Jobs
+            upload-on-run-attempts: "[1,2]"
+            fail-on-run-attempts: "[]"
+            re-run-mode: all-jobs
+    outputs:
+      json: ${{ steps.matrix-output.outputs.json }}
+    steps:
+      - name: Workflow Run Title
+        id: workflow-run-title
+        run: |
+          uuid="$(cat /proc/sys/kernel/random/uuid)"
+          workflow_title="Upload ${{ matrix.criteria.title }} ($uuid)"
+          echo "name=$workflow_title" | tee -a "$GITHUB_OUTPUT"
+      - name: Initiate upload workflow
+        uses: benc-uk/workflow-dispatch@e2e5e9a103e331dad343f381a29e654aea3cf8fc # v1.2.4
+        with:
+          workflow: upload.yaml
+          ref: ${{ env.BRANCH }}  # Workflow dispatch only works on branches or tags
+          inputs: |
+            {
+              "title": "${{ steps.workflow-run-title.outputs.name }}",
+              "upload-on-run-attempts": "${{ matrix.criteria.upload-on-run-attempts || '[]' }}",
+              "fail-on-run-attempts": "${{ matrix.criteria.fail-on-run-attempts || '[]' }}"
+            }
+      - run: sleep 5
+      # Utilizing a unique workflow run name to be able to identify the dispatched `run_id`
+      - name: Get workflow run
+        id: workflow-run
+        shell: bash
+        run: |
+          set -x
+          workflow_id="$(gh api -X GET --paginate "/repos/{owner}/{repo}/actions/workflows" --jq ".workflows[] | select(.path == \".github/workflows/${workflow_file:?}\").id")"
+          run="$(gh api -X GET --paginate "/repos/{owner}/{repo}/actions/runs" -f head_sha="${commit_sha:?}" --jq ".workflow_runs | map(select(.workflow_id == ${workflow_id:?} and .name == \"${workflow_run_name:?}\")) | .[0]")"
+          run_id="$(jq -er .id <<<"$run")"
+          echo "run-id=${run_id:?}" | tee -a "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          workflow_file: upload.yaml
+          workflow_run_name: ${{ steps.workflow-run-title.outputs.name }}
+          commit_sha: ${{ github.event.pull_request.head.sha }}
+      - uses: beacon-biosignals/wait-for-job@d572c2952a8938925a50b58e3fa361f0556c2421
+        id: wait-for-job
+        with:
+          run-id: ${{ steps.workflow-run.outputs.run-id }}
+          job-name: Upload
+          poll-interval: 5
+      - name: Re-run workflow
+        run: |
+          case "$mode" in
+              all-jobs)
+                  # https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2022-11-28#re-run-a-workflow
+                  gh api -X POST "/repos/{owner}/{repo}/actions/runs/${run_id:?}/rerun"
+                  ;;
+              failed-jobs)
+                  # https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2022-11-28#re-run-failed-jobs-from-a-workflow-run
+                  gh api -X POST "/repos/{owner}/{repo}/actions/runs/${run_id:?}/rerun-failed-jobs"
+                  ;;
+              single-job)
+                  # https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2022-11-28#re-run-a-job-from-a-workflow-run
+                  gh api -X POST "/repos/{owner}/{repo}/actions/jobs/${job_id:?}/rerun"
+                  ;;
+              *)
+                  echo "Unhandled mode: $mode" >&2
+                  exit 1
+                  ;;
+          esac
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          run_id: ${{ steps.workflow-run.outputs.run-id }}
+          job_id: ${{ steps.wait-for-job.outputs.job-id }}
+          mode: ${{ matrix.criteria.re-run-mode }}
+      - uses: beacon-biosignals/wait-for-job@d572c2952a8938925a50b58e3fa361f0556c2421
+        with:
+          run-id: ${{ steps.workflow-run.outputs.run-id }}
+          job-name: Upload
+          poll-interval: 5
+      - uses: beacon-biosignals/matrix-output@v1
+        id: matrix-output
+        with:
+          yaml: |
+            criteria-title: ${{ matrix.criteria.title }}
+            run-id: ${{ steps.workflow-run.outputs.run-id }}
+
+  test-rerun-single-job:
+    name: Test Re-run Single Job
+    needs: setup
+    # These permissions are needed to:
+    # - Checkout the repo
+    # - Download an artifact
+    permissions:
+      actions: read
+      contents: read
+    runs-on: ubuntu-latest
+    env:
+      run_id: ${{ fromJSON(needs.setup.outputs.json)[0].run-id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        id: download-run-attempt-1
+        with:
+          name: upload
+          run-id: ${{ env.run_id }}
+          run-attempt: 1
+        continue-on-error: true
+      - name: Validate
+        run: |
+          [[ "$outcome" == "success" ]] || exit 1
+          [[ "$(jq -er .run_attempt <metadata.json)" -eq 1 ]] || exit 1
+        env:
+          outcome: ${{ steps.download-run-attempt-1.outcome }}
+      - uses: ./
+        id: download-run-attempt-2
+        with:
+          name: upload
+          run-id: ${{ env.run_id }}
+          run-attempt: 2
+        continue-on-error: true
+      - name: Validate
+        run: |
+          [[ "$outcome" == "success" ]] || exit 1
+          [[ "$(jq -er .run_attempt <metadata.json)" -eq 2 ]] || exit 1
+        env:
+          outcome: ${{ steps.download-run-attempt-2.outcome }}
+
+  test-fallback:
+    name: Test Fallback
+    needs: setup
+    # These permissions are needed to:
+    # - Checkout the repo
+    # - Download an artifact
+    permissions:
+      actions: read
+      contents: read
+    runs-on: ubuntu-latest
+    env:
+      run_id: ${{ fromJSON(needs.setup.outputs.json)[1].run-id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        id: download-run-attempt-fallback
+        with:
+          name: upload
+          run-id: ${{ env.run_id }}
+          run-attempt: 2
+          allow-fallback: true
+        continue-on-error: true
+      - name: Validate
+        run: |
+          [[ "$outcome" == "success" ]] || exit 1
+          [[ "$(jq -er .run_attempt <metadata.json)" -eq 1 ]] || exit 1
+        env:
+          outcome: ${{ steps.download-run-attempt-fallback.outcome }}
+      - uses: ./
+        id: download-run-attempt-no-fallback
+        with:
+          name: upload
+          run-id: ${{ env.run_id }}
+          run-attempt: 2
+          allow-fallback: false
+        continue-on-error: true
+      - name: Validate
+        run: |
+          [[ "$outcome" == "failure" ]] || exit 1
+        env:
+          outcome: ${{ steps.download-run-attempt-no-fallback.outcome }}
+
+  test-rerun-failed-jobs:
+    name: Test Re-run Failed Jobs
+    needs: setup
+    # These permissions are needed to:
+    # - Checkout the repo
+    # - Download an artifact
+    permissions:
+      actions: read
+      contents: read
+    runs-on: ubuntu-latest
+    env:
+      run_id: ${{ fromJSON(needs.setup.outputs.json)[2].run-id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        id: download-run-attempt-1
+        with:
+          name: upload
+          run-id: ${{ env.run_id }}
+          run-attempt: 1
+        continue-on-error: true
+      - name: Validate
+        run: |
+          [[ "$outcome" == "success" ]] || exit 1
+          [[ "$(jq -er .run_attempt <metadata.json)" -eq 1 ]] || exit 1
+        env:
+          outcome: ${{ steps.download-run-attempt-1.outcome }}
+      - uses: ./
+        id: download-run-attempt-2
+        with:
+          name: upload
+          run-id: ${{ env.run_id }}
+          run-attempt: 2
+        continue-on-error: true
+      - name: Validate
+        run: |
+          [[ "$outcome" == "success" ]] || exit 1
+          [[ "$(jq -er .run_attempt <metadata.json)" -eq 2 ]] || exit 1
+        env:
+          outcome: ${{ steps.download-run-attempt-2.outcome }}
+
+
+  test-rerun-all-jobs:
+    name: Test Re-run All Jobs
+    needs: setup
+    # These permissions are needed to:
+    # - Checkout the repo
+    # - Download an artifact
+    permissions:
+      actions: read
+      contents: read
+    runs-on: ubuntu-latest
+    env:
+      run_id: ${{ fromJSON(needs.setup.outputs.json)[3].run-id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        id: download-run-attempt-1
+        with:
+          name: upload
+          run-id: ${{ env.run_id }}
+          run-attempt: 1
+        continue-on-error: true
+      - name: Validate
+        run: |
+          [[ "$outcome" == "failure" ]] || exit 1
+        env:
+          outcome: ${{ steps.download-run-attempt-1.outcome }}
+      - uses: ./
+        id: download-run-attempt-2
+        with:
+          name: upload
+          run-id: ${{ env.run_id }}
+          run-attempt: 2
+        continue-on-error: true
+      - name: Validate
+        run: |
+          [[ "$outcome" == "success" ]] || exit 1
+          [[ "$(jq -er .run_attempt <metadata.json)" -eq 2 ]] || exit 1
+        env:
+          outcome: ${{ steps.download-run-attempt-2.outcome }}

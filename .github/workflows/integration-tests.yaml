@@ -22,27 +22,31 @@ jobs:
       matrix:
         # Order unfortunately matters here
         criteria:
-          - title: Re-run Single Job
+          - partial-title: Re-run Single Job
             upload-on-run-attempts: "[1,2]"
             fail-on-run-attempts: "[]"
             re-run-mode: single-job
-          - title: Fallback
+          - partial-title: Fallback
             upload-on-run-attempts: "[1]"
             fail-on-run-attempts: "[]"
             re-run-mode: single-job
-          - title: Re-run Failed Jobs
+          - partial-title: Re-run Failed Jobs
             upload-on-run-attempts: "[1,2]"
             fail-on-run-attempts: "[1]"
             re-run-mode: failed-jobs
-          - title: Re-run All Jobs
+          - partial-title: Re-run All Jobs
             upload-on-run-attempts: "[1,2]"
             fail-on-run-attempts: "[]"
             re-run-mode: all-jobs
-    env:
-      title: "Upload ${{ matrix.criteria.title }} (${{ github.run_id }}, ${{ github.run_attempt }}, ${{ strategy.job-index }})"
     outputs:
       json: ${{ steps.matrix-output.outputs.json }}
     steps:
+      - name: Workflow Title
+        id: title
+        run: |
+          uuid="$(cat /proc/sys/kernel/random/uuid)"
+          title="Upload ${{ matrix.criteria.partial-title }} ($uuid)"
+          echo "name=$title" | tee -a "$GITHUB_OUTPUT"
       - name: Initiate upload workflow
         uses: benc-uk/workflow-dispatch@e2e5e9a103e331dad343f381a29e654aea3cf8fc # v1.2.4
         with:
@@ -50,7 +54,7 @@ jobs:
           ref: ${{ env.BRANCH }}  # Workflow dispatch only works on branches or tags
           inputs: |
             {
-              "title": "${{ env.title }}",
+              "title": "${{ steps.title.outputs.name }}",
               "upload-on-run-attempts": "${{ matrix.criteria.upload-on-run-attempts || '[]' }}",
               "fail-on-run-attempts": "${{ matrix.criteria.fail-on-run-attempts || '[]' }}"
             }
@@ -69,7 +73,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           workflow_file: upload.yaml
-          workflow_run_name: ${{ env.title }}
+          workflow_run_name: ${{ steps.title.outputs.name }}
           commit_sha: ${{ github.event.pull_request.head.sha }}
       - uses: beacon-biosignals/wait-for-job@d572c2952a8938925a50b58e3fa361f0556c2421
         id: wait-for-job
@@ -112,7 +116,7 @@ jobs:
         id: matrix-output
         with:
           yaml: |
-            title: ${{ matrix.criteria.title }}
+            partial-title: ${{ matrix.criteria.partial-title }}
             run-id: ${{ steps.workflow-run.outputs.run-id }}
 
   test-rerun-single-job:

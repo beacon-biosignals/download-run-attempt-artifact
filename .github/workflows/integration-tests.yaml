@@ -23,10 +23,16 @@ jobs:
         criteria:
           - upload-on-run-attempts: "[1,2]"
             fail-on-run-attempts: "[]"
-            re-run-mode: all-jobs
-          - upload-on-run-attempts: "[1,2]"
+            re-run-mode: single-job
+          - upload-on-run-attempts: "[1]"
             fail-on-run-attempts: "[]"
             re-run-mode: single-job
+          - upload-on-run-attempts: "[1,2]"
+            fail-on-run-attempts: "[1]"
+            re-run-mode: failed-jobs
+          - upload-on-run-attempts: "[1,2]"
+            fail-on-run-attempts: "[]"
+            re-run-mode: all-jobs
     env:
       title: "Upload (${{ github.run_id }}, ${{ github.run_attempt }}, ${{ strategy.job-index }})"
     outputs:
@@ -49,7 +55,7 @@ jobs:
         id: workflow-run
         run: |
           workflow_id="$(gh api -X GET --paginate "/repos/{owner}/{repo}/actions/workflows" --jq ".workflows[] | select(.path == \".github/workflows/${workflow_file:?}\").id")"
-          run_id="$(gh api -X GET --paginate "/repos/{owner}/{repo}/actions/runs" -f head_sha="${commit_sha:?}"--jq ".workflow_runs | map(select(.workflow_id == ${workflow_id:?} && .name == \"${workflow_run_name:?}\")) | .[0].id")"
+          run_id="$(gh api -X GET --paginate "/repos/{owner}/{repo}/actions/runs" -f head_sha="${commit_sha:?}" --jq ".workflow_runs | map(select(.workflow_id == ${workflow_id:?} && .name == \"${workflow_run_name:?}\")) | .[0].id")"
           echo "run-id=${run_id:?}" | tee -a "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}
@@ -100,8 +106,8 @@ jobs:
           yaml: |
             run-id: ${{ steps.workflow-run.outputs.run-id }}
 
-  test-rerun-all-jobs:
-    name: Test Re-run All Jobs
+  test-rerun-single-job:
+    name: Test Re-run Single Job
     needs: setup
     # These permissions are needed to:
     # - Checkout the repo
@@ -123,7 +129,8 @@ jobs:
         continue-on-error: true
       - name: Validate
         run: |
-          [[ "$outcome" == "failure" ]] || exit 1
+          [[ "$outcome" == "success" ]] || exit 1
+          [[ "$(jq -er .run_attempt <metadata.json)" -eq 1 ]] || exit 1
         env:
           outcome: ${{ steps.download-run-attempt-1.outcome }}
       - uses: ./
@@ -140,8 +147,8 @@ jobs:
         env:
           outcome: ${{ steps.download-run-attempt-2.outcome }}
 
-  test-rerun-single-job:
-    name: Test Re-run Single Job
+  test-fallback:
+    name: Test Fallback
     needs: setup
     # These permissions are needed to:
     # - Checkout the repo
@@ -155,6 +162,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./
+        id: download-run-attempt-fallback
+        with:
+          name: upload
+          run-id: ${{ env.run_id }}
+          run-attempt: 2
+          allow-fallback: true
+        continue-on-error: true
+      - name: Validate
+        run: |
+          [[ "$outcome" == "success" ]] || exit 1
+          [[ "$(jq -er .run_attempt <metadata.json)" -eq 1 ]] || exit 1
+        env:
+          outcome: ${{ steps.download-run-attempt-fallback.outcome }}
+      - uses: ./
+        id: download-run-attempt-no-fallback
+        with:
+          name: upload
+          run-id: ${{ env.run_id }}
+          run-attempt: 2
+          allow-fallback: false
+        continue-on-error: true
+      - name: Validate
+        run: |
+          [[ "$outcome" == "failure" ]] || exit 1
+        env:
+          outcome: ${{ steps.download-run-attempt-no-fallback.outcome }}
+
+  test-rerun-all-jobs:
+    name: Test Re-run All Jobs
+    needs: setup
+    # These permissions are needed to:
+    # - Checkout the repo
+    # - Download an artifact
+    permissions:
+      actions: read
+      contents: read
+    runs-on: ubuntu-latest
+    env:
+      run_id: ${{ fromJSON(needs.setup.outputs.json)[3].run-id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
         id: download-run-attempt-1
         with:
           name: upload
@@ -163,8 +212,7 @@ jobs:
         continue-on-error: true
       - name: Validate
         run: |
-          [[ "$outcome" == "success" ]] || exit 1
-          [[ "$(jq -er .run_attempt <metadata.json)" -eq 1 ]] || exit 1
+          [[ "$outcome" == "failure" ]] || exit 1
         env:
           outcome: ${{ steps.download-run-attempt-1.outcome }}
       - uses: ./

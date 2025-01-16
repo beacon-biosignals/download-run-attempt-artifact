@@ -1,8 +1,8 @@
 # Download Run Attempt Artifact
 
-Downloads an artifact which was uploaded by workflow in the specified run attempt. This
-action mirrors the `actions/download-artifact` but additionally supports downloading an
-artifact from a specific `run-attempt`.
+Downloads an artifact which was uploaded by workflow in the specified run attempt. This action mirrors the `actions/download-artifact` but additionally supports downloading an artifact from a specific `run-attempt`.
+
+> Note: GitHub artifacts from previous run attempts will persist when you re-run a single job or if you use "Re-run failed jobs". Using "Re-run all jobs" however will cause artifacts from previous attempts to be deleted. For more details see: https://github.com/orgs/community/discussions/17854.
 
 ## Example
 

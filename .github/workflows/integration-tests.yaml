@@ -11,7 +11,7 @@ env:
 
 jobs:
   setup:
-    name: "Setup: ${{ matrix.criteria.title }}"
+    name: Setup ${{ matrix.criteria.title }}
     # These permissions are needed to:
     # - Re-run a job from a workflow: https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2022-11-28#re-run-a-job-from-a-workflow-run
     permissions:
@@ -22,7 +22,7 @@ jobs:
       matrix:
         # Order unfortunately matters here
         criteria:
-          - title: Re-run single job
+          - title: Re-run Single Job
             upload-on-run-attempts: "[1,2]"
             fail-on-run-attempts: "[]"
             re-run-mode: single-job
@@ -30,16 +30,16 @@ jobs:
             upload-on-run-attempts: "[1]"
             fail-on-run-attempts: "[]"
             re-run-mode: single-job
-          - title: Re-run failed jobs
+          - title: Re-run Failed Jobs
             upload-on-run-attempts: "[1,2]"
             fail-on-run-attempts: "[1]"
             re-run-mode: failed-jobs
-          - title: Re-run all jobs
+          - title: Re-run All Jobs
             upload-on-run-attempts: "[1,2]"
             fail-on-run-attempts: "[]"
             re-run-mode: all-jobs
     env:
-      title: "Upload: ${{ matrix.criteria.title }} (${{ github.run_id }}, ${{ github.run_attempt }}, ${{ strategy.job-index }})"
+      title: "Upload ${{ matrix.criteria.title }} (${{ github.run_id }}, ${{ github.run_attempt }}, ${{ strategy.job-index }})"
     outputs:
       json: ${{ steps.matrix-output.outputs.json }}
     steps:

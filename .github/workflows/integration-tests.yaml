@@ -112,7 +112,7 @@ jobs:
           run-id: ${{ steps.workflow-run.outputs.run-id }}
           job-name: Upload
           poll-interval: 5
-      - uses: beacon-biosignals/matrix-output@f9929284716a81ec50f08db938aa09574a7f0d34
+      - uses: beacon-biosignals/matrix-output@v1
         id: matrix-output
         with:
           yaml: |

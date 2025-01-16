@@ -112,7 +112,7 @@ jobs:
         id: matrix-output
         with:
           yaml: |
-            title: ${{ matix.criteria.title }}
+            title: ${{ matrix.criteria.title }}
             run-id: ${{ steps.workflow-run.outputs.run-id }}
 
   test-rerun-single-job:

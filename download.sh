@@ -94,7 +94,7 @@ while read -r artifact; do
 
     # https://docs.github.com/en/rest/actions/artifacts?apiVersion=2022-11-28#download-an-artifact
     gh api -X GET "/repos/{owner}/{repo}/actions/artifacts/${artifact_id}/zip" >"/tmp/${artifact_name}.zip"
-    unzip "/tmp/${artifact_name}.zip" -d "${dest_dir}"
+    unzip -o "/tmp/${artifact_name}.zip" -d "${dest_dir}"
     rm "/tmp/${artifact_name}.zip"
 done < <(jq -c '.[]' <<<"${artifacts:?}")
 

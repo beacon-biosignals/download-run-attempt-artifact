@@ -43,7 +43,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: ${{ steps.criteria.outputs.should-upload == 'true' }}
         with:
-          name: upload-each-attempt
+          name: upload
           path: metadata.json
       - name: Fail on attempt
         if: ${{ steps.criteria.outputs.should-fail == 'true' }}

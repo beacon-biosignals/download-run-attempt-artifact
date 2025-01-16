@@ -53,6 +53,7 @@ jobs:
         with:
           run-id: ${{ steps.workflow-run.outputs.run-id }}
           job-name: Upload
+          poll-interval: 5
       - name: Re-run workflow
         run: |
           case "$mode" in
@@ -83,14 +84,15 @@ jobs:
         with:
           run-id: ${{ steps.workflow-run.outputs.run-id }}
           job-name: Upload
+          poll-interval: 5
       - uses: beacon-biosignals/matrix-output@f9929284716a81ec50f08db938aa09574a7f0d34
         id: matrix-output
         with:
           yaml: |
             run-id: ${{ steps.workflow-run.outputs.run-id }}
 
-  test-each-attempt:
-    name: Test Each Attempt
+  test-rerun-all-jobs:
+    name: Test Re-run All Jobs
     needs: setup
     # These permissions are needed to:
     # - Checkout the repo
@@ -99,25 +101,76 @@ jobs:
       actions: read
       contents: read
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        run-attempt:
-          - 1
-          - 2
+    env:
+      run_id: ${{ fromJSON(needs.setup.outputs.json)[0].run-id }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./
-        id: download-run-attempt
+        id: download-run-attempt-1
         with:
-          name: upload-each-attempt
-          run-id: ${{ fromJSON(needs.setup.outputs.json)[0].run-id }}
-          run-attempt: ${{ matrix.run-attempt }}
-      - name: Show downloaded run-attempt file
+          name: upload
+          run-id: ${{ env.run_id }}
+          run-attempt: 1
+        continue-on-error: true
+      - name: Validate
         run: |
-          [[ "$(jq -er .run_attempt <metadata.json)" -eq $run_attempt ]] || exit 1
+          [[ "$outcome" == "failure" ]] || exit 1
         env:
-          run_attempt: ${{ matrix.run-attempt }}
+          outcome: ${{ steps.download-run-attempt-1.outcome }}
+      - uses: ./
+        id: download-run-attempt-2
+        with:
+          name: upload
+          run-id: ${{ env.run_id }}
+          run-attempt: 2
+        continue-on-error: true
+      - name: Validate
+        run: |
+          [[ "$outcome" == "success" ]] || exit 1
+          [[ "$(jq -er .run_attempt <metadata.json)" -eq 2 ]] || exit 1
+        env:
+          outcome: ${{ steps.download-run-attempt-2.outcome }}
+
+  test-rerun-single-job:
+    name: Test Re-run Single Job
+    needs: setup
+    # These permissions are needed to:
+    # - Checkout the repo
+    # - Download an artifact
+    permissions:
+      actions: read
+      contents: read
+    runs-on: ubuntu-latest
+    env:
+      run_id: ${{ fromJSON(needs.setup.outputs.json)[1].run-id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        id: download-run-attempt-1
+        with:
+          name: upload
+          run-id: ${{ env.run_id }}
+          run-attempt: 1
+        continue-on-error: true
+      - name: Validate
+        run: |
+          [[ "$outcome" == "success" ]] || exit 1
+          [[ "$(jq -er .run_attempt <metadata.json)" -eq 1 ]] || exit 1
+        env:
+          outcome: ${{ steps.download-run-attempt-1.outcome }}
+      - uses: ./
+        id: download-run-attempt-2
+        with:
+          name: upload
+          run-id: ${{ env.run_id }}
+          run-attempt: 2
+        continue-on-error: true
+      - name: Validate
+        run: |
+          [[ "$outcome" == "success" ]] || exit 1
+          [[ "$(jq -er .run_attempt <metadata.json)" -eq 2 ]] || exit 1
+        env:
+          outcome: ${{ steps.download-run-attempt-2.outcome }}
 
   # test-first-attempt:
   #   name: Test First Attempt

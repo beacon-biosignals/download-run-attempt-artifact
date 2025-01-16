@@ -192,6 +192,48 @@ jobs:
         env:
           outcome: ${{ steps.download-run-attempt-no-fallback.outcome }}
 
+  test-rerun-failed-jobs:
+    name: Test Re-run Failed Jobs
+    needs: setup
+    # These permissions are needed to:
+    # - Checkout the repo
+    # - Download an artifact
+    permissions:
+      actions: read
+      contents: read
+    runs-on: ubuntu-latest
+    env:
+      run_id: ${{ fromJSON(needs.setup.outputs.json)[2].run-id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        id: download-run-attempt-1
+        with:
+          name: upload
+          run-id: ${{ env.run_id }}
+          run-attempt: 1
+        continue-on-error: true
+      - name: Validate
+        run: |
+          [[ "$outcome" == "success" ]] || exit 1
+          [[ "$(jq -er .run_attempt <metadata.json)" -eq 1 ]] || exit 1
+        env:
+          outcome: ${{ steps.download-run-attempt-1.outcome }}
+      - uses: ./
+        id: download-run-attempt-2
+        with:
+          name: upload
+          run-id: ${{ env.run_id }}
+          run-attempt: 2
+        continue-on-error: true
+      - name: Validate
+        run: |
+          [[ "$outcome" == "success" ]] || exit 1
+          [[ "$(jq -er .run_attempt <metadata.json)" -eq 2 ]] || exit 1
+        env:
+          outcome: ${{ steps.download-run-attempt-2.outcome }}
+
+
   test-rerun-all-jobs:
     name: Test Re-run All Jobs
     needs: setup
@@ -231,32 +273,3 @@ jobs:
           [[ "$(jq -er .run_attempt <metadata.json)" -eq 2 ]] || exit 1
         env:
           outcome: ${{ steps.download-run-attempt-2.outcome }}
-
-  # test-first-attempt:
-  #   name: Test First Attempt
-  #   needs: setup
-  #   # These permissions are needed to:
-  #   # - Checkout the repo
-  #   # - Download an artifact
-  #   permissions:
-  #     actions: read
-  #     contents: read
-  #   runs-on: ubuntu-latest
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       run-attempt:
-  #         - 1
-  #         - 2
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: ./
-  #       id: download-run-attempt
-  #       with:
-  #         name: upload-each-attempt
-  #         run-id: ${{ needs.setup.outputs.run-id }}
-  #         run-attempt: ${{ matrix.run-attempt }}
-  #         allow-fallback: true
-  #     - name: Show downloaded run-attempt file
-  #       run: |
-  #         [[ "$(jq -er .run_attempt <metadata.json)" -eq 1 ]] || exit 1

@@ -81,7 +81,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           workflow_file: upload.yaml
           workflow_run_name: ${{ steps.workflow-run-title.outputs.name }}
-          commit_sha: ${{ github.event.pull_request.head.sha }}
+          commit_sha: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: beacon-biosignals/wait-for-job@d572c2952a8938925a50b58e3fa361f0556c2421
         id: wait-for-job
         with:

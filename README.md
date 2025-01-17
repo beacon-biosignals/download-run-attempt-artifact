@@ -2,34 +2,44 @@
 
 Downloads an artifact which was uploaded by workflow in the specified run attempt. This action mirrors the `actions/download-artifact` but additionally supports downloading an artifact from a specific `run-attempt`.
 
-> Note: GitHub artifacts from previous run attempts will persist when you re-run a single job or if you use "Re-run failed jobs". Using "Re-run all jobs" however will cause artifacts from previous attempts to be deleted. For more details see: https://github.com/orgs/community/discussions/17854.
+Primarily, this action is useful in scenarios where you are interating with other GitHub Action workflows and want to ensure that multiple steps are consistently downloading artifacts from the exact same run ID and attempt. Most users needs are probably met by using [`actions/download-artifact`](https://github.com/actions/download-artifact) which always downloads from the latest run attempt.
+
+## Limitations
+
+GitHub artifacts from previous run attempts will persist when you re-run a single job or if you use "Re-run failed jobs". Using "Re-run all jobs" however will cause artifacts from previous attempts to be deleted. For more details see: https://github.com/orgs/community/discussions/17854.
 
 ## Example
+
+TODO: update
 
 ```yaml
 ---
 jobs:
-  test:
+  example:
+    # These permissions are needed to:
+    # - Get the workflow run: https://github.com/beacon-biosignals/get-workflow-run#permissions
+    # - Download the run attempt artifact: https://github.com/beacon-biosignals/download-run-attempt-artifact#permissions
+    permissions:
+      actions: read
     permissions: {}
     runs-on: ubuntu-latest
     steps:
+      # Utilize another action to determine a specific run ID and attempt for consistent
+      # access to another workflow.
+      - name: Determine latest build
+        id: build
+        uses: beacon-biosignals/get-workflow-run@v1
+        with:
+          workflow-file: build.yaml  # Another GHA workflow
+          commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: beacon-biosignals/download-run-attempt-artifact@v1
-        if: ${{ github.run-attempt > 1 }}
         with:
-          run-id: ${{ github.run_id }}
-          run-attempt: ${{ github.run_attempt }}
+          run-id: ${{ steps.build.outputs.run-id }}
+          run-attempt: ${{ steps.build.outputs.run-attempt }}
           allow-fallback: true
-      - name: Show downloaded run-attempt file
-        if: ${{ github.run_attempt > 1 }}
+      - name: Show download contents
         run: |
-          cat run-attempt
-      - name: Create run-attempt file
-        run: |
-          echo "${{ github.run_attempt }}" >run-attempt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: my-artifact
-          path: run-attempt
+          ls "${{ steps.download-run-attempt.outputs.download-path }}"
 ```
 
 ## Inputs
@@ -53,4 +63,9 @@ jobs:
 
 ## Permissions
 
-No [job permissions](https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs) are required to run this action.
+The following [job permissions](https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs) are required to run this action:
+
+```yaml
+permissions:
+  actions: read
+```

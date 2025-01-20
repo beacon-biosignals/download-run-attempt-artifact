@@ -10,36 +10,38 @@ GitHub artifacts from previous run attempts will persist when you re-run a singl
 
 ## Example
 
-TODO: update
-
 ```yaml
 ---
+name: Generate Report
+on:
+  workflow_dispatch:
+    inputs:
+      run-id:
+        description: Numeric ID for the GHA workflow run.
+        type: string
+        required: true
+      run-attempt:
+        description: Attempt number for the provided `run-id`.
+        type: string
+        required: true
 jobs:
   example:
     # These permissions are needed to:
-    # - Get the workflow run: https://github.com/beacon-biosignals/get-workflow-run#permissions
     # - Download the run attempt artifact: https://github.com/beacon-biosignals/download-run-attempt-artifact#permissions
     permissions:
       actions: read
     permissions: {}
     runs-on: ubuntu-latest
     steps:
-      # Utilize another action to determine a specific run ID and attempt for consistent
-      # access to another workflow.
-      - name: Determine latest build
-        id: build
-        uses: beacon-biosignals/get-workflow-run@v1
-        with:
-          workflow-file: build.yaml  # Another GHA workflow
-          commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: beacon-biosignals/download-run-attempt-artifact@v1
+        id: download-run-attempt
         with:
-          run-id: ${{ steps.build.outputs.run-id }}
-          run-attempt: ${{ steps.build.outputs.run-attempt }}
-          allow-fallback: true
-      - name: Show download contents
+          run-id: ${{ inputs.run-id }}
+          run-attempt: ${{ inputs.run-attempt }}
+          allow-fallback: true  # Re-running an single job may require us to fetch the artifact from a previous attempt
+      - name: Show artifact contents
         run: |
-          ls "${{ steps.download-run-attempt.outputs.download-path }}"
+          ls -la "${{ steps.download-run-attempt.outputs.download-path }}"
 ```
 
 ## Inputs

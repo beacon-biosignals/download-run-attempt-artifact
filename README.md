@@ -2,34 +2,46 @@
 
 Downloads an artifact which was uploaded by workflow in the specified run attempt. This action mirrors the `actions/download-artifact` but additionally supports downloading an artifact from a specific `run-attempt`.
 
-> Note: GitHub artifacts from previous run attempts will persist when you re-run a single job or if you use "Re-run failed jobs". Using "Re-run all jobs" however will cause artifacts from previous attempts to be deleted. For more details see: https://github.com/orgs/community/discussions/17854.
+Primarily, this action is useful in scenarios where you are interating with other GitHub Action workflows and want to ensure that multiple steps are consistently downloading artifacts from the exact same run ID and attempt. Most users needs are probably met by using [`actions/download-artifact`](https://github.com/actions/download-artifact) which always downloads from the latest run attempt.
+
+## Limitations
+
+GitHub artifacts from previous run attempts will persist when you re-run a single job or if you use "Re-run failed jobs". Using "Re-run all jobs" however will cause artifacts from previous attempts to be deleted. For more details see: https://github.com/orgs/community/discussions/17854.
 
 ## Example
 
 ```yaml
 ---
+name: Generate Report
+on:
+  workflow_dispatch:
+    inputs:
+      run-id:
+        description: Numeric ID for the GHA workflow run.
+        type: string
+        required: true
+      run-attempt:
+        description: Attempt number for the provided `run-id`.
+        type: string
+        required: true
 jobs:
-  test:
+  example:
+    # These permissions are needed to:
+    # - Download the run attempt artifact: https://github.com/beacon-biosignals/download-run-attempt-artifact#permissions
+    permissions:
+      actions: read
     permissions: {}
     runs-on: ubuntu-latest
     steps:
       - uses: beacon-biosignals/download-run-attempt-artifact@v1
-        if: ${{ github.run-attempt > 1 }}
+        id: download-run-attempt
         with:
-          run-id: ${{ github.run_id }}
-          run-attempt: ${{ github.run_attempt }}
-          allow-fallback: true
-      - name: Show downloaded run-attempt file
-        if: ${{ github.run_attempt > 1 }}
+          run-id: ${{ inputs.run-id }}
+          run-attempt: ${{ inputs.run-attempt }}
+          allow-fallback: true  # Re-running an single job may require us to fetch the artifact from a previous attempt
+      - name: Show artifact contents
         run: |
-          cat run-attempt
-      - name: Create run-attempt file
-        run: |
-          echo "${{ github.run_attempt }}" >run-attempt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: my-artifact
-          path: run-attempt
+          ls -la "${{ steps.download-run-attempt.outputs.download-path }}"
 ```
 
 ## Inputs
@@ -53,4 +65,9 @@ jobs:
 
 ## Permissions
 
-No [job permissions](https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs) are required to run this action.
+The following [job permissions](https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs) are required to run this action:
+
+```yaml
+permissions:
+  actions: read
+```

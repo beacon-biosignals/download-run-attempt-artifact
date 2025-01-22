@@ -27,6 +27,7 @@ merge_multiple="${merge_multiple:-false}"
 echo "path=$path" >&2
 
 # Determine the timeframe of the workflow run attempt.
+# https://docs.github.com/en/rest/actions/workflow-jobs?apiVersion=2022-11-28#list-jobs-for-a-workflow-run-attempt
 run_timeframe="$(gh api -X GET --paginate "/repos/{owner}/{repo}/actions/runs/${run_id:?}/attempts/${run_attempt:?}/jobs" --jq '
     .jobs | {
         created_at: map(.created_at | select(. != null)) | min,  # Earliest non-null datetime (may be null if all entries null).

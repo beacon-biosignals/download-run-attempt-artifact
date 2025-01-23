@@ -1,9 +1,7 @@
 ---
 name: Download Run Attempt Artifact
-description: >-
-  Downloads an artifact which was uploaded by workflow in the specified run attempt. This
-  action mirrors the `actions/download-artifact` but additionally supports downloading an
-  artifact from a specific `run-attempt`.
+description: >-  # Must be less than 125 characters
+  Downloads an artifact uploaded by a specific workflow run attempt.
 branding:
   color: purple
   icon: download

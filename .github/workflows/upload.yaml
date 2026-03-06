@@ -40,7 +40,7 @@ jobs:
               --argjson run_attempt "${{ github.run_attempt }}" \
               '$ARGS.named' >metadata.json
           jq <metadata.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ steps.criteria.outputs.should-upload == 'true' }}
         with:
           name: upload

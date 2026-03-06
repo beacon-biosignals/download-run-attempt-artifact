@@ -136,7 +136,7 @@ jobs:
     env:
       run_id: ${{ fromJSON(needs.setup.outputs.json)[0].run-id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./
         id: download-run-attempt-1
         with:
@@ -177,7 +177,7 @@ jobs:
     env:
       run_id: ${{ fromJSON(needs.setup.outputs.json)[1].run-id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./
         id: download-run-attempt-fallback
         with:
@@ -219,7 +219,7 @@ jobs:
     env:
       run_id: ${{ fromJSON(needs.setup.outputs.json)[2].run-id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./
         id: download-run-attempt-1
         with:
@@ -261,7 +261,7 @@ jobs:
     env:
       run_id: ${{ fromJSON(needs.setup.outputs.json)[3].run-id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./
         id: download-run-attempt-1
         with:
